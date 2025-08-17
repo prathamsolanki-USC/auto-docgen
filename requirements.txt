@@ -1,0 +1,27 @@
+# Auto-DocGen: AI-Powered API Documentation Generator
+# Core dependencies for production use
+
+# AI and ML dependencies
+pydantic-ai>=0.0.8
+pydantic>=2.0.0
+openai>=1.0.0
+
+# Web framework and server
+flask>=2.3.0
+werkzeug>=2.3.0
+
+# Configuration and environment
+python-dotenv>=1.0.0
+
+# JSON and data handling
+typing-extensions>=4.0.0
+
+# Legacy support (for backward compatibility)
+huggingface_hub>=0.15.0
+
+# Development dependencies (optional)
+# Uncomment for development
+# pytest>=7.0.0
+# black>=23.0.0
+# flake8>=6.0.0
+# mypy>=1.0.0

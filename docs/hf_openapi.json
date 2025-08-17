@@ -1,0 +1,67 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Flask API Documentation",
+    "version": "1.0.0",
+    "description": "Auto-generated API documentation using Hugging Face model"
+  },
+  "paths": {
+    "/menu": {
+      "post": {
+        "operationId": "add_menu_item",
+        "summary": "Add new menu item",
+        "description": "Add a new menu item. Expects a JSON body with `name` (string) and `price` (number). Returns the created item with its generated `id`.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "price": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "name",
+                  "price"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Menu item created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "price": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "price"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

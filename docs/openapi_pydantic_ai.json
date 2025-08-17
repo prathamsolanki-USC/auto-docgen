@@ -1,0 +1,54 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Flask API Documentation",
+    "description": "Auto-generated API documentation using Pydantic AI agents",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "http://localhost:5000",
+      "description": "Development server"
+    }
+  ],
+  "paths": {
+    "/hello": {
+      "get": {
+        "operationId": "hello",
+        "summary": "Returns a greeting message",
+        "description": "Returns a simple greeting message. Example: curl -X GET 'http://localhost:5000/hello'",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "example": {
+                  "message": "hello world"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/echo": {
+      "post": {
+        "operationId": "echo",
+        "summary": "Echos back the JSON data received in the request body",
+        "description": "This endpoint receives JSON data in the request body and echos it back in the response body. Example: curl -X POST 'http://localhost:5000/echo'",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "example": {
+                  "echo": {}
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
