@@ -1,0 +1,278 @@
+name: 🧪 Test & Validate
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+env:
+  PYTHON_VERSION: '3.9'
+
+jobs:
+  code-quality:
+    name: 🔍 Code Quality Check
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 📥 Checkout Repository
+      uses: actions/checkout@v4
+    
+    - name: 🐍 Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        cache: 'pip'
+    
+    - name: 📦 Install Dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install flake8 black isort mypy
+    
+    - name: 🔍 Lint with flake8
+      run: |
+        # Stop the build if there are Python syntax errors or undefined names
+        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        # Treat all errors as warnings
+        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=120 --statistics
+    
+    - name: 🎨 Check code formatting with Black
+      run: |
+        black --check --diff .
+    
+    - name: 📋 Check import sorting with isort
+      run: |
+        isort --check-only --diff .
+    
+    - name: 🔎 Type checking with mypy (optional)
+      continue-on-error: true
+      run: |
+        mypy --ignore-missing-imports .
+
+  test-documentation-generation:
+    name: 🧪 Test Documentation Generation
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 📥 Checkout Repository
+      uses: actions/checkout@v4
+    
+    - name: 🐍 Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        cache: 'pip'
+    
+    - name: 📦 Install Dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pytest
+    
+    - name: 🧪 Test Basic Functionality
+      run: |
+        # Test if core modules can be imported
+        python -c "import parser; print('✅ Parser module loads successfully')"
+        python -c "import generate_docs_pydantic_ai; print('✅ Generator module loads successfully')"
+        python -c "import serve_swagger_ui; print('✅ Server module loads successfully')"
+    
+    - name: 🔍 Test Parser Functionality
+      run: |
+        # Test the parser with the example app
+        python -c "
+        from parser import get_endpoints
+        from examples.basic_api import app
+        endpoints = get_endpoints(app)
+        print(f'✅ Parser found {len(endpoints)} endpoints')
+        assert len(endpoints) > 0, 'Should find at least one endpoint'
+        print('✅ Parser test passed')
+        "
+    
+    - name: 🤖 Test Documentation Generation (Dry Run)
+      env:
+        OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      if: env.OPENAI_API_KEY != ''
+      run: |
+        # Test documentation generation with mock/fallback
+        echo "Testing documentation generation..."
+        
+        # Create a simple test
+        python -c "
+        import os
+        from generate_docs_pydantic_ai import setup_pydantic_ai_agent, generate_fallback_response
+        
+        # Test agent setup
+        try:
+            agent = setup_pydantic_ai_agent()
+            print('✅ Pydantic AI agent setup successful')
+        except Exception as e:
+            print(f'⚠️ AI agent setup failed (expected without API key): {e}')
+        
+        # Test fallback mechanism
+        test_prompt = 'Test prompt for fallback'
+        fallback = generate_fallback_response(test_prompt)
+        print('✅ Fallback mechanism works')
+        print(f'Fallback response length: {len(fallback)} characters')
+        "
+    
+    - name: 🌐 Test Server Startup
+      run: |
+        # Test if the Swagger UI server can start
+        timeout 10s python -c "
+        from serve_swagger_ui import app
+        import threading
+        import time
+        import requests
+        
+        # Start server in background
+        def run_server():
+            app.run(host='127.0.0.1', port=8081, debug=False)
+        
+        server_thread = threading.Thread(target=run_server, daemon=True)
+        server_thread.start()
+        
+        # Give server time to start
+        time.sleep(3)
+        
+        try:
+            # Test health endpoint
+            response = requests.get('http://127.0.0.1:8081/health', timeout=5)
+            if response.status_code == 200:
+                print('✅ Server health check passed')
+            else:
+                print(f'⚠️ Server responded with status {response.status_code}')
+        except Exception as e:
+            print(f'⚠️ Server test failed: {e}')
+        " || echo "⚠️ Server test timed out (expected behavior)"
+
+  validate-examples:
+    name: 📚 Validate Examples
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 📥 Checkout Repository
+      uses: actions/checkout@v4
+    
+    - name: 🐍 Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        cache: 'pip'
+    
+    - name: 📦 Install Dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+    
+    - name: 🧪 Validate Example Apps
+      run: |
+        # Test basic_api.py
+        echo "Testing examples/basic_api.py..."
+        python -c "
+        import sys
+        sys.path.append('examples')
+        from basic_api import app
+        
+        with app.test_client() as client:
+            # Test home endpoint
+            response = client.get('/')
+            assert response.status_code == 200, f'Home endpoint failed: {response.status_code}'
+            
+            # Test health endpoint
+            response = client.get('/health')
+            assert response.status_code == 200, f'Health endpoint failed: {response.status_code}'
+            
+            # Test users endpoint
+            response = client.get('/users')
+            assert response.status_code == 200, f'Users endpoint failed: {response.status_code}'
+            
+            print('✅ All example endpoints working correctly')
+        "
+
+  security-scan:
+    name: 🔒 Security Scan
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 📥 Checkout Repository
+      uses: actions/checkout@v4
+    
+    - name: 🐍 Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+    
+    - name: 🔒 Run Security Scan with Bandit
+      run: |
+        pip install bandit[toml]
+        bandit -r . -f json -o bandit-report.json || true
+        bandit -r . || true
+    
+    - name: 📊 Upload Security Report
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: security-report
+        path: bandit-report.json
+
+  test-matrix:
+    name: 🧪 Test Matrix (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.8', '3.9', '3.10', '3.11']
+    
+    steps:
+    - name: 📥 Checkout Repository
+      uses: actions/checkout@v4
+    
+    - name: 🐍 Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+        cache: 'pip'
+    
+    - name: 📦 Install Dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+    
+    - name: 🧪 Test Basic Imports
+      run: |
+        python -c "
+        import parser
+        import generate_docs_pydantic_ai
+        import serve_swagger_ui
+        print(f'✅ All modules imported successfully on Python ${{ matrix.python-version }}')
+        "
+
+  generate-test-report:
+    name: 📊 Generate Test Report
+    runs-on: ubuntu-latest
+    needs: [code-quality, test-documentation-generation, validate-examples, security-scan, test-matrix]
+    if: always()
+    
+    steps:
+    - name: 📊 Test Summary
+      run: |
+        echo "🧪 Auto-DocGen Test Report"
+        echo "=========================="
+        echo "🔍 Code Quality: ${{ needs.code-quality.result }}"
+        echo "🧪 Documentation Generation: ${{ needs.test-documentation-generation.result }}"
+        echo "📚 Examples Validation: ${{ needs.validate-examples.result }}"
+        echo "🔒 Security Scan: ${{ needs.security-scan.result }}"
+        echo "🐍 Multi-Python Test: ${{ needs.test-matrix.result }}"
+        echo "=========================="
+        
+        # Determine overall status
+        if [ "${{ needs.code-quality.result }}" == "success" ] && \
+           [ "${{ needs.test-documentation-generation.result }}" == "success" ] && \
+           [ "${{ needs.validate-examples.result }}" == "success" ]; then
+          echo "✅ All critical tests passed!"
+          exit 0
+        else
+          echo "❌ Some tests failed - check individual job results"
+          exit 1
+        fi

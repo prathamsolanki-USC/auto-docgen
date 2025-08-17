@@ -1,0 +1,250 @@
+name: 📖 Manual Documentation Update
+
+on:
+  workflow_dispatch:
+    inputs:
+      force_update:
+        description: 'Force documentation update even if no changes detected'
+        required: false
+        default: 'false'
+        type: boolean
+      model_choice:
+        description: 'AI Model to use for generation'
+        required: false
+        default: 'gpt-3.5-turbo-0125'
+        type: choice
+        options:
+        - gpt-3.5-turbo-0125
+        - gpt-4
+        - gpt-4-turbo
+      target_app:
+        description: 'Target Flask app to document'
+        required: false
+        default: 'app.py'
+        type: string
+
+env:
+  PYTHON_VERSION: '3.9'
+
+jobs:
+  manual-documentation-update:
+    name: 📚 Manual Documentation Update
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 📥 Checkout Repository
+      uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: 🐍 Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        cache: 'pip'
+    
+    - name: 📦 Install Dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+    
+    - name: 🔐 Configure Environment
+      run: |
+        echo "OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}" >> .env
+        echo "AI_MODEL=${{ github.event.inputs.model_choice }}" >> .env
+        echo "FLASK_APP_PATH=${{ github.event.inputs.target_app }}" >> .env
+    
+    - name: 📋 Pre-Generation Info
+      run: |
+        echo "🤖 Manual Documentation Update Started"
+        echo "======================================"
+        echo "🎯 Target App: ${{ github.event.inputs.target_app }}"
+        echo "🧠 AI Model: ${{ github.event.inputs.model_choice }}"
+        echo "🔄 Force Update: ${{ github.event.inputs.force_update }}"
+        echo "👤 Triggered by: ${{ github.actor }}"
+        echo "🕐 Started at: $(date -u +"%Y-%m-%d %H:%M:%S UTC")"
+        echo "======================================"
+    
+    - name: 🔍 Backup Existing Documentation
+      run: |
+        if [ -f "docs/openapi_pydantic_ai.json" ]; then
+          cp docs/openapi_pydantic_ai.json docs/openapi_pydantic_ai.json.backup
+          echo "✅ Backed up existing documentation"
+        else
+          echo "ℹ️ No existing documentation to backup"
+        fi
+    
+    - name: 🤖 Generate Documentation
+      id: generate
+      run: |
+        echo "🚀 Starting documentation generation with ${{ github.event.inputs.model_choice }}..."
+        
+        # Modify the generator to use the specified model if needed
+        if [ "${{ github.event.inputs.model_choice }}" != "gpt-3.5-turbo-0125" ]; then
+          echo "🔧 Updating model configuration..."
+          sed -i "s/gpt-3.5-turbo-0125/${{ github.event.inputs.model_choice }}/g" generate_docs_pydantic_ai.py
+        fi
+        
+        # Run the documentation generator
+        python generate_docs_pydantic_ai.py
+        
+        # Verify generation
+        if [ -f "docs/openapi_pydantic_ai.json" ]; then
+          ENDPOINTS_COUNT=$(jq '.paths | length' docs/openapi_pydantic_ai.json)
+          echo "endpoints-count=$ENDPOINTS_COUNT" >> $GITHUB_OUTPUT
+          echo "generation-success=true" >> $GITHUB_OUTPUT
+          echo "✅ Documentation generated successfully for $ENDPOINTS_COUNT endpoints"
+        else
+          echo "generation-success=false" >> $GITHUB_OUTPUT
+          echo "❌ Documentation generation failed"
+          exit 1
+        fi
+    
+    - name: 📊 Compare Documentation
+      id: compare
+      if: steps.generate.outputs.generation-success == 'true'
+      run: |
+        if [ -f "docs/openapi_pydantic_ai.json.backup" ]; then
+          if diff -q docs/openapi_pydantic_ai.json docs/openapi_pydantic_ai.json.backup > /dev/null; then
+            echo "changes-detected=false" >> $GITHUB_OUTPUT
+            echo "📄 No changes detected in documentation"
+          else
+            echo "changes-detected=true" >> $GITHUB_OUTPUT
+            echo "🔄 Changes detected in documentation"
+            
+            # Show summary of changes
+            echo "📋 Documentation Changes Summary:"
+            echo "================================="
+            
+            OLD_ENDPOINTS=$(jq '.paths | length' docs/openapi_pydantic_ai.json.backup 2>/dev/null || echo "0")
+            NEW_ENDPOINTS=$(jq '.paths | length' docs/openapi_pydantic_ai.json)
+            
+            echo "📊 Endpoints: $OLD_ENDPOINTS → $NEW_ENDPOINTS"
+            
+            if [ "$NEW_ENDPOINTS" -gt "$OLD_ENDPOINTS" ]; then
+              echo "➕ Added $((NEW_ENDPOINTS - OLD_ENDPOINTS)) new endpoints"
+            elif [ "$NEW_ENDPOINTS" -lt "$OLD_ENDPOINTS" ]; then
+              echo "➖ Removed $((OLD_ENDPOINTS - NEW_ENDPOINTS)) endpoints"
+            else
+              echo "🔄 Endpoint content updated (same count)"
+            fi
+          fi
+        else
+          echo "changes-detected=true" >> $GITHUB_OUTPUT
+          echo "📄 New documentation created"
+        fi
+    
+    - name: 🎨 Generate Enhanced UI
+      if: steps.generate.outputs.generation-success == 'true'
+      run: |
+        echo "🎨 Generating enhanced Swagger UI..."
+        
+        # Generate timestamp
+        TIMESTAMP=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
+        
+        # Create enhanced index.html
+        cat > docs/index.html << EOF
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Auto-DocGen API Documentation</title>
+            <link rel="stylesheet" type="text/css" href="https://unpkg.com/swagger-ui-dist@5.9.0/swagger-ui.css" />
+            <style>
+                .swagger-ui .topbar { background-color: #1976d2; }
+                .manual-update-badge {
+                    background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%);
+                    color: white; padding: 15px; text-align: center; font-size: 14px;
+                    margin-bottom: 20px; border-radius: 5px;
+                }
+            </style>
+        </head>
+        <body>
+            <div class="manual-update-badge">
+                🔧 Manually Updated Documentation | 
+                Model: ${{ github.event.inputs.model_choice }} | 
+                Updated: $TIMESTAMP | 
+                By: ${{ github.actor }} |
+                Endpoints: ${{ steps.generate.outputs.endpoints-count }}
+            </div>
+            <div id="swagger-ui"></div>
+            <script src="https://unpkg.com/swagger-ui-dist@5.9.0/swagger-ui-bundle.js"></script>
+            <script>
+                SwaggerUIBundle({
+                    url: './openapi_pydantic_ai.json',
+                    dom_id: '#swagger-ui',
+                    presets: [SwaggerUIBundle.presets.apis, SwaggerUIBundle.presets.standalone],
+                    layout: "StandaloneLayout"
+                });
+            </script>
+        </body>
+        </html>
+        EOF
+        
+        echo "✅ Enhanced Swagger UI generated"
+    
+    - name: 📤 Commit Changes
+      if: steps.generate.outputs.generation-success == 'true' && (steps.compare.outputs.changes-detected == 'true' || github.event.inputs.force_update == 'true')
+      run: |
+        # Configure git
+        git config --local user.email "action@github.com"
+        git config --local user.name "Auto-DocGen Manual Update"
+        
+        # Add files
+        git add docs/openapi_pydantic_ai.json docs/index.html
+        
+        # Create detailed commit message
+        COMMIT_MSG="📖 Manual documentation update
+
+        🤖 Generated using: ${{ github.event.inputs.model_choice }}
+        👤 Requested by: ${{ github.actor }}
+        📊 Total endpoints: ${{ steps.generate.outputs.endpoints-count }}
+        🎯 Target app: ${{ github.event.inputs.target_app }}
+        🔄 Force update: ${{ github.event.inputs.force_update }}
+        🕐 Generated at: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+        
+        Manual update via GitHub Actions workflow"
+        
+        git commit -m "$COMMIT_MSG"
+        echo "✅ Changes committed successfully"
+    
+    - name: 🚀 Push Changes
+      if: steps.generate.outputs.generation-success == 'true' && (steps.compare.outputs.changes-detected == 'true' || github.event.inputs.force_update == 'true')
+      uses: ad-m/github-push-action@master
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        branch: ${{ github.ref }}
+    
+    - name: 🧹 Cleanup
+      if: always()
+      run: |
+        # Remove backup file
+        rm -f docs/openapi_pydantic_ai.json.backup
+        
+        # Remove .env file (for security)
+        rm -f .env
+    
+    - name: 📊 Summary Report
+      if: always()
+      run: |
+        echo "📖 Manual Documentation Update Summary"
+        echo "====================================="
+        echo "✅ Generation Success: ${{ steps.generate.outputs.generation-success }}"
+        echo "🔄 Changes Detected: ${{ steps.compare.outputs.changes-detected }}"
+        echo "📊 Total Endpoints: ${{ steps.generate.outputs.endpoints-count }}"
+        echo "🧠 AI Model Used: ${{ github.event.inputs.model_choice }}"
+        echo "🎯 Target App: ${{ github.event.inputs.target_app }}"
+        echo "👤 Requested By: ${{ github.actor }}"
+        echo "🕐 Completed At: $(date -u +"%Y-%m-%d %H:%M:%S UTC")"
+        echo "====================================="
+        
+        if [ "${{ steps.generate.outputs.generation-success }}" == "true" ]; then
+          if [ "${{ steps.compare.outputs.changes-detected }}" == "true" ] || [ "${{ github.event.inputs.force_update }}" == "true" ]; then
+            echo "✅ Documentation successfully updated and pushed!"
+          else
+            echo "ℹ️ No changes detected - documentation is up to date"
+          fi
+        else
+          echo "❌ Documentation generation failed"
+        fi
