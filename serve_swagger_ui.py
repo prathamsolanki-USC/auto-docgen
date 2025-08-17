@@ -6,12 +6,13 @@ This script serves a Swagger UI interface for the generated OpenAPI specificatio
 using the openapi_pydantic_ai.json file.
 """
 
-import os
 import json
-from flask import Flask, render_template_string, jsonify, send_from_directory
-import webbrowser
+import os
 import threading
 import time
+import webbrowser
+
+from flask import Flask, jsonify, render_template_string, send_from_directory
 
 app = Flask(__name__)
 
@@ -198,46 +199,61 @@ SWAGGER_UI_HTML = """
 </html>
 """
 
-@app.route('/')
+
+@app.route("/")
 def swagger_ui():
     """Serve the Swagger UI interface"""
     host_url = f"http://localhost:{app.config.get('PORT', 8080)}"
     return render_template_string(SWAGGER_UI_HTML, host_url=host_url)
 
-@app.route('/api/openapi.json')
+
+@app.route("/api/openapi.json")
 def openapi_spec():
     """Serve the OpenAPI specification JSON"""
     try:
         # Read the generated OpenAPI spec
-        spec_path = os.path.join(os.path.dirname(__file__), 'docs', 'openapi_pydantic_ai.json')
-        
-        if not os.path.exists(spec_path):
-            return jsonify({
-                "error": "OpenAPI specification not found",
-                "message": "Please run generate_docs_pydantic_ai.py first to generate the OpenAPI spec",
-                "expected_path": spec_path
-            }), 404
-        
-        with open(spec_path, 'r') as f:
-            spec_data = json.load(f)
-        
-        return jsonify(spec_data)
-    
-    except Exception as e:
-        return jsonify({
-            "error": "Failed to load OpenAPI specification",
-            "message": str(e)
-        }), 500
+        spec_path = os.path.join(
+            os.path.dirname(__file__), "docs", "openapi_pydantic_ai.json"
+        )
 
-@app.route('/health')
+        if not os.path.exists(spec_path):
+            return (
+                jsonify(
+                    {
+                        "error": "OpenAPI specification not found",
+                        "message": "Please run generate_docs_pydantic_ai.py first to generate the OpenAPI spec",
+                        "expected_path": spec_path,
+                    }
+                ),
+                404,
+            )
+
+        with open(spec_path, "r") as f:
+            spec_data = json.load(f)
+
+        return jsonify(spec_data)
+
+    except Exception as e:
+        return (
+            jsonify(
+                {"error": "Failed to load OpenAPI specification", "message": str(e)}
+            ),
+            500,
+        )
+
+
+@app.route("/health")
 def health_check():
     """Health check endpoint"""
-    return jsonify({
-        "status": "healthy",
-        "service": "Swagger UI Server",
-        "openapi_spec": "/api/openapi.json",
-        "documentation": "/"
-    })
+    return jsonify(
+        {
+            "status": "healthy",
+            "service": "Swagger UI Server",
+            "openapi_spec": "/api/openapi.json",
+            "documentation": "/",
+        }
+    )
+
 
 def open_browser(url):
     """Open browser after a delay to ensure server is running"""
@@ -249,27 +265,32 @@ def open_browser(url):
         print(f"⚠️  Could not open browser automatically: {e}")
         print(f"🔗 Please manually open: {url}")
 
+
 def main():
     """Main function to run the Swagger UI server"""
-    
+
     # Check if OpenAPI spec exists
-    spec_path = os.path.join(os.path.dirname(__file__), 'docs', 'openapi_pydantic_ai.json')
-    
+    spec_path = os.path.join(
+        os.path.dirname(__file__), "docs", "openapi_pydantic_ai.json"
+    )
+
     if not os.path.exists(spec_path):
         print("❌ OpenAPI specification not found!")
         print(f"📁 Expected location: {spec_path}")
-        print("🔧 Please run 'python generate_docs_pydantic_ai.py' first to generate the OpenAPI spec")
+        print(
+            "🔧 Please run 'python generate_docs_pydantic_ai.py' first to generate the OpenAPI spec"
+        )
         return
-    
+
     # Configuration
-    HOST = '0.0.0.0'  # Allow external access
+    HOST = "0.0.0.0"  # Allow external access
     PORT = 8080
-    
-    app.config['PORT'] = PORT
-    
+
+    app.config["PORT"] = PORT
+
     # Server info
     local_url = f"http://localhost:{PORT}"
-    
+
     print("🚀 Starting Swagger UI Server...")
     print("=" * 60)
     print(f"📊 OpenAPI Spec: {spec_path}")
@@ -292,19 +313,19 @@ def main():
     print("=" * 60)
     print("⏹️  Press Ctrl+C to stop the server")
     print()
-    
+
     # Open browser in a separate thread
     browser_thread = threading.Thread(target=open_browser, args=(local_url,))
     browser_thread.daemon = True
     browser_thread.start()
-    
+
     try:
         # Run the Flask server
         app.run(
             host=HOST,
             port=PORT,
             debug=False,  # Set to True for development
-            use_reloader=False  # Disable to prevent double startup
+            use_reloader=False,  # Disable to prevent double startup
         )
     except KeyboardInterrupt:
         print("\n🛑 Server stopped by user")
@@ -312,6 +333,7 @@ def main():
         print(f"❌ Server error: {e}")
     finally:
         print("👋 Goodbye!")
+
 
 if __name__ == "__main__":
     main()

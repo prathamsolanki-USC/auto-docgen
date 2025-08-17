@@ -16,7 +16,7 @@
       "get": {
         "operationId": "hello",
         "summary": "Returns a greeting message",
-        "description": "Returns a simple greeting message. Example: curl -X GET 'http://localhost:5000/hello'",
+        "description": "This endpoint returns a simple greeting message. Example: curl -X GET 'http://localhost:5000/hello'",
         "responses": {
           "200": {
             "description": "Successful response",
@@ -34,8 +34,8 @@
     "/echo": {
       "post": {
         "operationId": "echo",
-        "summary": "Echos back the JSON data received in the request body",
-        "description": "This endpoint receives JSON data in the request body and echos it back in the response body. Example: curl -X POST 'http://localhost:5000/echo'",
+        "summary": "Echo the JSON data received in the request",
+        "description": "This endpoint echoes the JSON data received in the request. Example: curl -X POST 'http://localhost:5000/echo'",
         "responses": {
           "200": {
             "description": "Successful response",

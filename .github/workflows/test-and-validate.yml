@@ -34,17 +34,17 @@ jobs:
     - name: 🔍 Lint with flake8
       run: |
         # Stop the build if there are Python syntax errors or undefined names
-        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics --exclude=.venv,__pycache__,pratham-test,.git
         # Treat all errors as warnings
-        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=120 --statistics
+        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=120 --statistics --exclude=.venv,__pycache__,pratham-test,.git
     
     - name: 🎨 Check code formatting with Black
       run: |
-        black --check --diff .
+        black --check --diff . --exclude="(.venv|__pycache__|pratham-test|.git)"
     
     - name: 📋 Check import sorting with isort
       run: |
-        isort --check-only --diff .
+        isort --check-only --diff . --skip=.venv --skip=__pycache__ --skip=pratham-test --skip=.git
     
     - name: 🔎 Type checking with mypy (optional)
       continue-on-error: true
@@ -119,33 +119,27 @@ jobs:
     
     - name: 🌐 Test Server Startup
       run: |
-        # Test if the Swagger UI server can start
-        timeout 10s python -c "
-        from serve_swagger_ui import app
-        import threading
-        import time
-        import requests
-        
-        # Start server in background
-        def run_server():
-            app.run(host='127.0.0.1', port=8081, debug=False)
-        
-        server_thread = threading.Thread(target=run_server, daemon=True)
-        server_thread.start()
-        
-        # Give server time to start
-        time.sleep(3)
-        
+        # Test if the Swagger UI server can start (simplified test)
+        python -c "
         try:
-            # Test health endpoint
-            response = requests.get('http://127.0.0.1:8081/health', timeout=5)
-            if response.status_code == 200:
-                print('✅ Server health check passed')
-            else:
-                print(f'⚠️ Server responded with status {response.status_code}')
+            from serve_swagger_ui import app
+            print('✅ Server module loads and app object created successfully')
+            
+            # Test that routes are defined
+            routes = [rule.rule for rule in app.url_map.iter_rules()]
+            expected_routes = ['/', '/api/openapi.json', '/health']
+            
+            for route in expected_routes:
+                if route in routes:
+                    print(f'✅ Route {route} is defined')
+                else:
+                    print(f'⚠️ Route {route} not found')
+            
+            print('✅ Server startup test completed')
         except Exception as e:
-            print(f'⚠️ Server test failed: {e}')
-        " || echo "⚠️ Server test timed out (expected behavior)"
+            print(f'❌ Server test failed: {e}')
+            raise
+        "
 
   validate-examples:
     name: 📚 Validate Examples
