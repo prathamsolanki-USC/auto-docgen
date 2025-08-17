@@ -69,12 +69,15 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
-        pip install pytest
     
     - name: 🧪 Test Basic Functionality
       run: |
         # Test if core modules can be imported
         python -c "import parser; print('✅ Parser module loads successfully')"
+        
+        # Create dummy .env for testing
+        echo "OPENAI_API_KEY=dummy_key_for_testing" > .env
+        
         python -c "import generate_docs_pydantic_ai; print('✅ Generator module loads successfully')"
         python -c "import serve_swagger_ui; print('✅ Server module loads successfully')"
     
@@ -82,63 +85,66 @@ jobs:
       run: |
         # Test the parser with the example app
         python -c "
+        import sys
+        sys.path.append('examples')
         from parser import get_endpoints
-        from examples.basic_api import app
+        from basic_api import app
         endpoints = get_endpoints(app)
         print(f'✅ Parser found {len(endpoints)} endpoints')
         assert len(endpoints) > 0, 'Should find at least one endpoint'
         print('✅ Parser test passed')
         "
     
-    - name: 🤖 Test Documentation Generation (Dry Run)
-      env:
-        OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-      if: env.OPENAI_API_KEY != ''
+    - name: 🤖 Test Documentation Generation (Fallback)
       run: |
-        # Test documentation generation with mock/fallback
-        echo "Testing documentation generation..."
+        # Test documentation generation fallback mechanism
+        echo "Testing fallback documentation generation..."
         
-        # Create a simple test
+        # Ensure dummy .env exists
+        echo "OPENAI_API_KEY=dummy_key_for_testing" > .env
+        
         python -c "
-        import os
-        from generate_docs_pydantic_ai import setup_pydantic_ai_agent, generate_fallback_response
-        
-        # Test agent setup
-        try:
-            agent = setup_pydantic_ai_agent()
-            print('✅ Pydantic AI agent setup successful')
-        except Exception as e:
-            print(f'⚠️ AI agent setup failed (expected without API key): {e}')
+        from generate_docs_pydantic_ai import generate_fallback_response
         
         # Test fallback mechanism
         test_prompt = 'Test prompt for fallback'
         fallback = generate_fallback_response(test_prompt)
         print('✅ Fallback mechanism works')
         print(f'Fallback response length: {len(fallback)} characters')
+        
+        # Verify it's valid JSON
+        import json
+        try:
+            json.loads(fallback)
+            print('✅ Fallback generates valid JSON')
+        except json.JSONDecodeError:
+            print('❌ Fallback JSON is invalid')
+            raise
         "
     
-    - name: 🌐 Test Server Startup
+    - name: 🌐 Test Server Routes
       run: |
-        # Test if the Swagger UI server can start (simplified test)
+        # Test if the Swagger UI server routes are defined correctly
         python -c "
-        try:
-            from serve_swagger_ui import app
-            print('✅ Server module loads and app object created successfully')
-            
-            # Test that routes are defined
-            routes = [rule.rule for rule in app.url_map.iter_rules()]
-            expected_routes = ['/', '/api/openapi.json', '/health']
-            
-            for route in expected_routes:
-                if route in routes:
-                    print(f'✅ Route {route} is defined')
-                else:
-                    print(f'⚠️ Route {route} not found')
-            
-            print('✅ Server startup test completed')
-        except Exception as e:
-            print(f'❌ Server test failed: {e}')
-            raise
+        from serve_swagger_ui import app
+        print('✅ Server module loads and app object created successfully')
+        
+        # Test that routes are defined
+        routes = [rule.rule for rule in app.url_map.iter_rules()]
+        expected_routes = ['/', '/api/openapi.json', '/health']
+        
+        all_found = True
+        for route in expected_routes:
+            if route in routes:
+                print(f'✅ Route {route} is defined')
+            else:
+                print(f'❌ Route {route} not found')
+                all_found = False
+        
+        if all_found:
+            print('✅ All expected routes are defined')
+        else:
+            raise Exception('Some routes are missing')
         "
 
   validate-examples:
@@ -164,9 +170,8 @@ jobs:
       run: |
         # Test basic_api.py
         echo "Testing examples/basic_api.py..."
+        cd examples
         python -c "
-        import sys
-        sys.path.append('examples')
         from basic_api import app
         
         with app.test_client() as client:
