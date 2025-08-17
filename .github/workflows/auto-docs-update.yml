@@ -76,7 +76,13 @@ jobs:
         
     - name: 🔐 Configure OpenAI API Key
       run: |
-        echo "OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}" >> .env
+        if [ -n "${{ secrets.OPENAI_API_KEY }}" ]; then
+          echo "OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}" >> .env
+          echo "✅ OpenAI API key configured"
+        else
+          echo "⚠️ OpenAI API key not found in secrets"
+          echo "OPENAI_API_KEY=dummy_key_for_testing" >> .env
+        fi
         
     - name: 🤖 Generate Documentation with Pydantic AI
       id: generate-docs
