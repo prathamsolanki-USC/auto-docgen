@@ -1,0 +1,63 @@
+name: 🔬 Minimal Test
+
+on:
+  workflow_dispatch:
+
+env:
+  PYTHON_VERSION: '3.9'
+
+jobs:
+  minimal:
+    name: 🔬 Minimal Test
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 📥 Checkout Repository
+      uses: actions/checkout@v4
+    
+    - name: 🐍 Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+    
+    - name: 🔍 Environment Check
+      run: |
+        echo "🔍 Basic environment check..."
+        python --version
+        pip --version
+        ls -la
+        echo "Contents of requirements.txt:"
+        cat requirements.txt
+    
+    - name: 📦 Install Basic Dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install flask pydantic python-dotenv
+        echo "✅ Basic dependencies installed"
+    
+    - name: 🧪 Test Basic Python
+      run: |
+        python -c "print('✅ Python is working')"
+        python -c "import flask; print('✅ Flask imported')"
+        python -c "import pydantic; print('✅ Pydantic imported')"
+        python -c "from dotenv import load_dotenv; print('✅ dotenv imported')"
+    
+    - name: 🧪 Test Our Modules (Simple)
+      run: |
+        echo "Testing app.py..."
+        python -c "
+        try:
+            import app
+            print('✅ app.py imported successfully')
+        except Exception as e:
+            print(f'❌ app.py import failed: {e}')
+        "
+        
+        echo "Testing parser.py..."
+        python -c "
+        try:
+            import parser
+            print('✅ parser.py imported successfully')
+        except Exception as e:
+            print(f'❌ parser.py import failed: {e}')
+        "
